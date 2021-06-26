@@ -1,3 +1,5 @@
+// 第二部分的code，尚未平行
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
