@@ -17,8 +17,8 @@
 #define RK4 3
 #define type_int KDK
 
-const int np = 1; // # of particles        MUSt BE SET AT FIRST
-const int G = 1;  //gravitational const
+const int np = 10; // # of particles        MUSt BE SET AT FIRST
+const int G = 1;   //gravitational const
 
 const double pi = 3.14159265359;
 const double L = 1;
@@ -39,7 +39,7 @@ void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np])
 void data_output(double p[np][3], double pv[np][3], double time);
 void set_Narray0_3d(double arr[N][N][N]);
 void set_particle_param0(double arr[np][3]);
-void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type]);
+void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type], double fix[2]);
 void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type]);
 void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type]);
 void force_interpolation(double p[np][3], double pm[np], double g_f[N][N][N][3], int g_sp[np][3], double g_w[np][type][type][type], double a[np][3]);
@@ -70,10 +70,11 @@ int main(void)
         mass[i] = i + 1;
         for (int cor = 0; cor < 3; cor++)
         {
-            pos[i][cor] = (double)(i + cor) / 20;
+            pos[i][cor] = 0.5 + (double)(i + cor) / 20;
             velocity[i][cor] = 0.2 * i + 1.2 * cor;
         }
     }
+    printf("Initial position.\n");
     FILE *fp = fopen("data.txt", "w");
     fprintf(fp, "t = %f\n", t);
     for (int i = 0; i < np; i++)
@@ -254,7 +255,7 @@ void data_output(double p[np][3], double pv[np][3], double time)
     {
         fprintf(fp, "%d. x = (%f, %f, %f),  ", i + 1, p[i][0], p[i][1], p[i][2]);
         fprintf(fp, "v = (%f, %f, %f)\n", pv[i][0], pv[i][1], pv[i][2]);
-        printf("%d. (%f, %f, %f)\n", i + 1, p[i][0], p[i][1], p[i][2]);
+        // printf("%d. (%f, %f, %f)\n", i + 1, p[i][0], p[i][1], p[i][2]);
     }
     fprintf(fp, "----------\n"); // print 10 "-"
     fclose(fp);
@@ -285,8 +286,11 @@ void set_particle_param0(double arr[np][3])
     }
 }
 
-void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type])
+// 用很怪很爛的方法就NGP
+void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type], double fix[2])
 {
+    int fix_a, fix_b;
+    printf("Deposition using NGP.\n");
     for (int i = 0; i < np; i++)
     {
         // int p_pos[3]; // To store the grid number of the current particle
@@ -342,6 +346,71 @@ void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
         // }
         // printf("\n");
     }
+
+    int i = 0;
+    int j = 0;
+    for (int k = 0; k < N; k++)
+    {
+        if (p[i][j] >= g[j][N - 1])
+        {
+            fix_a = N - 1;
+            break;
+        }
+        if (p[i][j] > g[j][k])
+        {
+            continue;
+        }
+        if (p[i][j] == 0.0 || p[i][j] == 1.0)
+        {
+            fix_a = 0;
+            break;
+        }
+        double l1 = fabs(p[i][j] - g[j][k]);
+        if (l1 <= dx / 2)
+        {
+            fix_a = k;
+            break;
+        }
+        else
+        {
+            fix_a = k - 1;
+            break;
+        }
+    }
+    j = 1;
+
+    for (int k = 0; k < N; k++)
+    {
+        if (p[i][j] >= g[j][N - 1])
+        {
+            fix_b = N - 1;
+            break;
+        }
+        if (p[i][j] > g[j][k])
+        {
+            continue;
+        }
+        if (p[i][j] == 0.0 || p[i][j] == 1.0)
+        {
+            fix_b = 0;
+            break;
+        }
+        double l1 = fabs(p[i][j] - g[j][k]);
+        if (l1 <= dx / 2)
+        {
+            fix_b = k;
+            break;
+        }
+        else
+        {
+            fix_b = k - 1;
+            break;
+        }
+    }
+    fix[0] = fix_a;
+    fix[1] = fix_b;
+
+    printf("Fix value (%f, %f).\n", fix[0], fix[1]);
 }
 
 void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type])
@@ -603,19 +672,28 @@ void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3])
     set_particle_param0(a);
 
     // initialize some storage array
-    double grid_mass[N][N][N];                // Store grid mass value
-    set_Narray0_3d(grid_mass);                // Set all # to 0
-    int grid_start_pos[np][3];                // The smallest grid id
+    double grid_mass[N][N][N]; // Store grid mass value
+    set_Narray0_3d(grid_mass); // Set all # to 0
+    int grid_start_pos[np][3]; // The smallest grid id
+    for (int i = 0; i < np; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            grid_start_pos[i][j] = 0;
+        }
+    }
     double grid_weight[np][type][type][type]; // It's a density function. NGP use 1. CLC use 8. TSC use 27. The order is the same with three for loop from x to z
 
     // Let the result force is (That is the result from Poisson solver)
     double grid_acc[N][N][N][3];
     set_3d_vec0(grid_acc);
 
+    double fix[2];
+
     // Deposite particle
     if (type == NGP)
     {
-        NGP_deposition(p, pm, g, grid_mass, grid_start_pos, grid_weight);
+        NGP_deposition(p, pm, g, grid_mass, grid_start_pos, grid_weight, fix);
     }
     if (type == CLC)
     {
@@ -626,10 +704,14 @@ void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3])
         TSC_deposition(p, pm, g, grid_mass, grid_start_pos, grid_weight);
     }
 
-    // for (int i = 0; i < np; i++)
-    // {
-    //     printf("(%d, %d, %d)\n", grid_start_pos[i][0], grid_start_pos[i][1], grid_start_pos[i][2]);
-    // }
+    grid_start_pos[0][0] = fix[0];
+    grid_start_pos[0][1] = fix[1];
+
+    printf("Outside NGP (after fix).\n");
+    for (int i = 0; i < np; i++)
+    {
+        printf("(%d, %d, %d)\n", grid_start_pos[i][0], grid_start_pos[i][1], grid_start_pos[i][2]);
+    }
 
     // Calculate the gravitational force with Poisson solver
     poisson(grid_mass, grid_acc);
