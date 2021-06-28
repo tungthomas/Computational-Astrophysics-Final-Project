@@ -21,7 +21,7 @@ const int np = 1; // # of particles        MUSt BE SET AT FIRST
 const int G = 1;  //gravitational const
 
 const double pi = 3.14159265359;
-const double L = 2. * pi;
+const double L = 1;
 const int N = 5;
 
 int step = 0; // record # of steps
@@ -584,6 +584,14 @@ void D_move(double p[np][3], double pv[np][3], double n)
         for (int j = 0; j < 3; j++)
         {
             p[i][j] += pv[i][j] * n * dt;
+            if (p[i][j] > L)
+            {
+                p[i][j] = fmod(p[i][j], L);
+            }
+            else if (p[i][j] < 0)
+            {
+                p[i][j] = fmod(p[i][j] + L, L);
+            }
         }
     }
 }
