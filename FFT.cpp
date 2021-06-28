@@ -14,6 +14,7 @@
 // Choose the integration type
 #define KDK 1
 #define DKD 2
+#define RK4 3
 #define type_int KDK
 
 const int np = 1; // # of particles        MUSt BE SET AT FIRST
@@ -27,9 +28,7 @@ int step = 0; // record # of steps
 double t = 0.0;
 double dt = 0.01; // Time scale
 
-// determine the runing step or total time. You can choose one of them to set
-int total_step = 100;
-double tf = 1; //end time
+double tf = 0.01; //end time
 
 // grid length
 double dx = L / N;
@@ -48,13 +47,15 @@ void K_move(double a[np][3], double pv[np][3], double n);
 void D_move(double p[np][3], double pv[np][3], double n);
 void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3]);
 void set_3d_vec0(double arr[N][N][N][3]);
-void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3])
-    // The following functions are just for testing
-    void direct_N(double p[np][3], double pm[np], double a[np][3]);
+void copy_particle_param(double arr[np][3], double cp_arr[np][3]);
+void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3]);
+// The following functions are just for testing
+void direct_N(double p[np][3], double pm[np], double a[np][3]);
 void direct_N_mesh(double g_m[N][N][N], double *g[3], double g_a[N][N][N][3]);
 
 int main(void)
 {
+
     // Store particle position
     double pos[np][3];
     double velocity[np][3];
@@ -62,7 +63,17 @@ int main(void)
 
     // Input the position of particles from csv file
     char filename[] = "test.csv";
-    csv_converter(filename, pos, velocity, mass);
+    // csv_converter(filename, pos, velocity, mass);
+
+    for (int i = 0; i < np; i++)
+    {
+        mass[i] = i + 1;
+        for (int cor = 0; cor < 3; cor++)
+        {
+            pos[i][cor] = (double)(i + cor) / 20;
+            velocity[i][cor] = 0.2 * i + 1.2 * cor;
+        }
+    }
 
     // // check if "pos" and "mass" is OK~
     // for (int i = 0; i < np; i++)
@@ -83,7 +94,7 @@ int main(void)
     linspace(0.0, L, N, z);
     double *grid[3] = {x, y, z}; //  Use to load the grid position
 
-    while (t < tf || step < total_step)
+    while (t < tf)
     {
         double acc[np][3];
         set_particle_param0(acc);
@@ -103,6 +114,68 @@ int main(void)
             K_move(acc, velocity, 1);
             D_move(pos, velocity, 0.5);
         }
+        if (type_int == RK4)
+        {
+            // Note that pos == initial position
+            double k1v[np][3];
+            double k1a[np][3];
+            double k2x[np][3];
+            double k2v[np][3];
+            double k2a[np][3];
+            double k3x[np][3];
+            double k3v[np][3];
+            double k3a[np][3];
+            double k4x[np][3];
+            double k4v[np][3];
+            double k4a[np][3];
+
+            // k1
+            copy_particle_param(velocity, k1v);
+            get_acc(pos, mass, grid, k1a);
+
+            // k2
+            copy_particle_param(pos, k2x); //  先複製後用以更新
+            D_move(k2x, velocity, 0.5);
+            get_acc(k2x, mass, grid, k2a);
+            copy_particle_param(k1v, k2v);
+            K_move(k2a, k2v, 0.5);
+
+            // k3
+            copy_particle_param(pos, k3x);
+            D_move(k3x, k2v, 0.5);
+            get_acc(k3x, mass, grid, k3a);
+            copy_particle_param(k2v, k3v);
+            K_move(k2a, k3v, 0.5);
+
+            // k4
+            copy_particle_param(pos, k4x);
+            D_move(k4x, k3v, 1);
+            get_acc(k4x, mass, grid, k4a);
+            copy_particle_param(k3v, k4v);
+            K_move(k3a, k4v, 1);
+
+            // new velocity
+            for (int i = 0; i < np; i++)
+            {
+                for (int cor = 0; cor < 3; cor++)
+                {
+                    velocity[i][cor] += (dt / 6) * (k1a[i][cor] + 2 * k2a[i][cor] + 2 * k3a[i][cor] + k4a[i][cor]);
+                }
+            }
+
+            // new position
+            for (int i = 0; i < np; i++)
+            {
+                for (int cor = 0; cor < 3; cor++)
+                {
+                    pos[i][cor] += (dt / 6) * (k1v[i][cor] + 2 * k2v[i][cor] + 2 * k3v[i][cor] + k4v[i][cor]);
+                }
+            }
+        }
+        t += dt;
+        step += 1;
+        printf("t = %f (step = %d)\n", t, step);
+        data_output(pos, t);
     }
     return 0;
 }
@@ -121,7 +194,7 @@ void linspace(float xi, float xf, int n, double func[])
 void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np])
 {
 
-    char table[np + 1][5][15];
+    char table[np + 1][5][25];
 
     FILE *fp = fopen(name, "r"); // fp指向文件头部
     for (int i = 0; i < np + 1; i++)
@@ -205,42 +278,42 @@ void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
 {
     for (int i = 0; i < np; i++)
     {
-        int p_pos[3]; // To store the grid number of the current particle
+        // int p_pos[3]; // To store the grid number of the current particle
         for (int j = 0; j < 3; j++)
         {
             for (int k = 0; k < N; k++)
             {
                 if (p[i][j] >= g[j][N - 1])
                 {
-                    p_pos[j] = N - 1;
+                    g_sp[i][j] = N - 1;
                     break;
                 }
                 if (p[i][j] > g[j][k])
                 {
                     continue;
                 }
+                // if (p[i][j] == 0.0 || p[i][j] == 1.0)
+                // {
+                //     g_sp[i][j] = 0;
+                //     break;
+                // }
                 double l1 = fabs(p[i][j] - g[j][k]);
                 if (l1 < dx / 2)
                 {
-                    p_pos[j] = k;
+                    g_sp[i][j] = k;
                     break;
                 }
                 else
                 {
-                    p_pos[j] = k - 1;
+                    g_sp[i][j] = k - 1;
                     break;
                 }
             }
         }
 
         // add mass
-        printf("(%d, %d, %d)\n", p_pos[0], p_pos[1], p_pos[2]);
-        g_m[p_pos[0]][p_pos[1]][p_pos[2]] += pm[i];
-
-        // record the dist. starting point
-        g_sp[i][0] = p_pos[0];
-        g_sp[i][1] = p_pos[1];
-        g_sp[i][2] = p_pos[2];
+        printf("(%d, %d, %d)\n", g_sp[i][0], g_sp[i][1], g_sp[i][2]);
+        g_m[g_sp[i][0]][g_sp[i][1]][g_sp[i][2]] += pm[i];
 
         // record the mass distribution
         g_w[np][0][0][0] = 1;
@@ -472,7 +545,7 @@ void force_interpolation(double p[np][3], double pm[np], double g_f[N][N][N][3],
                 {
                     for (int cor = 0; cor < 3; cor++)
                     {
-                        a[i][cor] = g_f[g_sp[i][0] + xn][g_sp[i][1] + yn][g_sp[i][2] + zn][cor] * g_w[i][xn][yn][zn] / pm[i];
+                        a[i][cor] += g_f[g_sp[i][0] + xn][g_sp[i][1] + yn][g_sp[i][2] + zn][cor] * g_w[i][xn][yn][zn] / pm[i];
                     }
                 }
             }
@@ -506,6 +579,9 @@ void D_move(double p[np][3], double pv[np][3], double n)
 
 void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3])
 {
+
+    // set the input array "a" to 0
+    set_particle_param0(a);
 
     // initialize some storage array
     double grid_mass[N][N][N];                // Store grid mass value
@@ -549,7 +625,7 @@ void set_3d_vec0(double arr[N][N][N][3])
         {
             for (int k = 0; k < N; k++)
             {
-                for (int cor = 0; cor < N; cor++)
+                for (int cor = 0; cor < 3; cor++)
                 {
                     arr[i][j][k][cor] = 0.0;
                 }
@@ -559,7 +635,7 @@ void set_3d_vec0(double arr[N][N][N][3])
 }
 
 //
-// The following functions are just for testing.
+// The following two functions are just for testing.
 //
 // If we need to use the direct N-body to calculate the self-gravity on each partticle
 void direct_N(double p[np][3], double pm[np], double a[np][3])
@@ -772,4 +848,15 @@ void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3])
     fftw_free(out2);
     fftw_free(in1);
     fftw_free(in2);
+}
+
+void copy_particle_param(double arr[np][3], double cp_arr[np][3])
+{
+    for (int i = 0; i < np; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            cp_arr[i][j] = arr[i][j];
+        }
+    }
 }
