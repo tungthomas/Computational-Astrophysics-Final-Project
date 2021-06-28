@@ -34,7 +34,7 @@ double tf = dt * 10; //end time
 double dx = L / N;
 // Define functions
 
-void linspace(float xi, float xf, int n, double func[]);
+void linspace(double xi, double xf, int n, double func[]);
 void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np]);
 void data_output(double p[np][3], double pv[np][3], double time);
 void set_Narray0_3d(double arr[N][N][N]);
@@ -70,7 +70,7 @@ int main(void)
         mass[i] = i + 1;
         for (int cor = 0; cor < 3; cor++)
         {
-            pos[i][cor] = 0.5 + (double)(i + cor) / 20;
+            pos[i][cor] = (double)(i + cor) / 20;
             velocity[i][cor] = 0.2 * i + 1.2 * cor;
         }
     }
@@ -192,9 +192,10 @@ int main(void)
 }
 
 // Use Dynamic Allocation to form a linspace like Python
-void linspace(float xi, float xf, int n, double func[])
+void linspace(double xi, double xf, int n, double func[])
 {
-    float space = (xf - xi) / n;
+    double space = (xf - xi) / n;
+
     for (int i = 0; i < n; i++)
     {
         func[i] = xi + space / 2 + i * space;
@@ -672,16 +673,9 @@ void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3])
     set_particle_param0(a);
 
     // initialize some storage array
-    double grid_mass[N][N][N]; // Store grid mass value
-    set_Narray0_3d(grid_mass); // Set all # to 0
-    int grid_start_pos[np][3]; // The smallest grid id
-    for (int i = 0; i < np; i++)
-    {
-        for (int j = 0; j < 3; j++)
-        {
-            grid_start_pos[i][j] = 0;
-        }
-    }
+    double grid_mass[N][N][N];                // Store grid mass value
+    set_Narray0_3d(grid_mass);                // Set all # to 0
+    int grid_start_pos[np][3];                // The smallest grid id
     double grid_weight[np][type][type][type]; // It's a density function. NGP use 1. CLC use 8. TSC use 27. The order is the same with three for loop from x to z
 
     // Let the result force is (That is the result from Poisson solver)
