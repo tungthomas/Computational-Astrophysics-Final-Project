@@ -28,7 +28,7 @@ int step = 0; // record # of steps
 double t = 0.0;
 double dt = 0.01; // Time scale
 
-double tf = 0.01; //end time
+double tf = dt * 10; //end time
 
 // grid length
 double dx = L / N;
@@ -36,7 +36,7 @@ double dx = L / N;
 
 void linspace(float xi, float xf, int n, double func[]);
 void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np]);
-void data_output(double p[np][3], double time);
+void data_output(double p[np][3], double pv[np][3], double time);
 void set_Narray0_3d(double arr[N][N][N]);
 void set_particle_param0(double arr[np][3]);
 void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type]);
@@ -74,6 +74,16 @@ int main(void)
             velocity[i][cor] = 0.2 * i + 1.2 * cor;
         }
     }
+    FILE *fp = fopen("data.txt", "w");
+    fprintf(fp, "t = %f\n", t);
+    for (int i = 0; i < np; i++)
+    {
+        fprintf(fp, "%d. x = (%f, %f, %f), ", i + 1, pos[i][0], pos[i][1], pos[i][2]);
+        fprintf(fp, "v = (%f, %f, %f)\n", velocity[i][0], velocity[i][1], velocity[i][2]);
+        printf("%d. (%f, %f, %f)\n", i + 1, pos[i][0], pos[i][1], pos[i][2]);
+    }
+    fprintf(fp, "----------\n"); // print 10 "-"
+    fclose(fp);
 
     // // check if "pos" and "mass" is OK~
     // for (int i = 0; i < np; i++)
@@ -175,7 +185,7 @@ int main(void)
         t += dt;
         step += 1;
         printf("t = %f (step = %d)\n", t, step);
-        data_output(pos, t);
+        data_output(pos, velocity, t);
     }
     return 0;
 }
@@ -237,16 +247,18 @@ void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np])
     }
 }
 
-void data_output(double p[np][3], double time)
+void data_output(double p[np][3], double pv[np][3], double time)
 {
     FILE *fp = fopen("data.txt", "a");
-    fprintf(fp, "t = %f\n", time);
+    fprintf(fp, "t = %f\n", t);
     for (int i = 0; i < np; i++)
     {
-        fprintf(fp, "%d. (%f, %f, %f)\n", i + 1, p[i][0], p[i][1], p[i][2]);
+        fprintf(fp, "%d. x = (%f, %f, %f),  ", i + 1, p[i][0], p[i][1], p[i][2]);
+        fprintf(fp, "v = (%f, %f, %f)\n", pv[i][0], pv[i][1], pv[i][2]);
         printf("%d. (%f, %f, %f)\n", i + 1, p[i][0], p[i][1], p[i][2]);
     }
     fprintf(fp, "----------\n"); // print 10 "-"
+    fclose(fp);
 }
 
 void set_Narray0_3d(double arr[N][N][N])
