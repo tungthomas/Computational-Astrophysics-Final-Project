@@ -84,18 +84,18 @@ void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3]){
 
     // checking the results computed
 
-    double erl1 = 0.;
-    for ( i = 0; i < N; i++) {
-        for( j = 0; j < N; j++){
-            for ( k = 0; k < N; k++){
-                erl1 += fabs( in1[i*N*N + j*N + k][0] -  3.*out2[i*N*N + j*N + k][0]/(N*N*N))*dx*dx;
-                std::cout<< i <<" "<< j<<" "<< k<<" "<< sin(X[i])*sin(Y[j])*cos(Z[k])<<" "<<  out2[i*N*N+j*N+k][0]/(N*N*N) <<" "<< std::endl; // > output
-            }
-        }
-    }
-    printf("\n");
-    std::cout<< "erl1 = "<< erl1 << std::endl ;  // L1 error
-    printf("-----------------------------------------------------------------------------------\n");
+//    double erl1 = 0.;
+//    for ( i = 0; i < N; i++) {
+//        for( j = 0; j < N; j++){
+//            for ( k = 0; k < N; k++){
+//                erl1 += fabs( in1[i*N*N + j*N + k][0] -  3.*out2[i*N*N + j*N + k][0]/(N*N*N))*dx*dx;
+//                std::cout<< i <<" "<< j<<" "<< k<<" "<< sin(X[i])*sin(Y[j])*cos(Z[k])<<" "<<  out2[i*N*N+j*N+k][0]/(N*N*N) <<" "<< std::endl; // > output
+//            }
+//        }
+//    }
+//    printf("\n");
+//    std::cout<< "erl1 = "<< erl1 << std::endl ;  // L1 error
+//    printf("-----------------------------------------------------------------------------------\n");
     
     double phi[N][N][N];
     for ( i = 0; i < N; i++){
