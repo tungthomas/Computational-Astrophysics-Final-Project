@@ -1,9 +1,9 @@
+#include <fftw3.h>
+#include <iostream>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <iostream>
-#include <fftw3.h>
 
 // Choose the deposition type
 #define NGP 1
@@ -16,12 +16,12 @@
 #define DKD 2
 #define type_int KDK
 
-const int np = 1;     // # of particles        MUSt BE SET AT FIRST
-const int G = 1;      //gravitational const
+const int np = 1; // # of particles        MUSt BE SET AT FIRST
+const int G = 1;  //gravitational const
 
 const double pi = 3.14159265359;
-const double L  = 2.*pi;
-const int    N  = 8;
+const double L = 2. * pi;
+const int N = 8;
 
 int step = 0; // record # of steps
 double t = 0.0;
@@ -37,7 +37,9 @@ double dx = L / N;
 
 void linspace(float xi, float xf, int n, double func[]);
 void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np]);
+void data_output(double p[np][3], double time);
 void set_Narray0_3d(double arr[N][N][N]);
+void set_particle_param0(double arr[np][3]);
 void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type]);
 void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type]);
 void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][N][N], int g_sp[np][3], double g_w[np][type][type][type]);
@@ -46,8 +48,9 @@ void K_move(double a[np][3], double pv[np][3], double n);
 void D_move(double p[np][3], double pv[np][3], double n);
 void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3]);
 void set_3d_vec0(double arr[N][N][N][3]);
-// The following functions are just for testing
-void direct_N(double p[np][3], double pm[np], double a[np][3]);
+void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3])
+    // The following functions are just for testing
+    void direct_N(double p[np][3], double pm[np], double a[np][3]);
 void direct_N_mesh(double g_m[N][N][N], double *g[3], double g_a[N][N][N][3]);
 
 int main(void)
@@ -159,6 +162,18 @@ void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np])
         }
         printf("\n");
     }
+}
+
+void data_output(double p[np][3], double time)
+{
+    FILE *fp = fopen("data.txt", "a");
+    fprintf(fp, "t = %f\n", time);
+    for (int i = 0; i < np; i++)
+    {
+        fprintf(fp, "%d. (%f, %f, %f)\n", i + 1, p[i][0], p[i][1], p[i][2]);
+        printf("%d. (%f, %f, %f)\n", i + 1, p[i][0], p[i][1], p[i][2]);
+    }
+    fprintf(fp, "----------\n"); // print 10 "-"
 }
 
 void set_Narray0_3d(double arr[N][N][N])
@@ -520,7 +535,7 @@ void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3])
     poisson(grid_mass, grid_acc);
     // Use direct N-body to calculate the gravitational force for comparison
 
-    direct_N_mesh(grid_mass, g, grid_acc);
+    // direct_N_mesh(grid_mass, g, grid_acc);
 
     //  force interpolation for all particles 加權(?
     force_interpolation(p, pm, grid_acc, grid_start_pos, grid_weight, a);
@@ -595,72 +610,94 @@ void direct_N_mesh(double g_m[N][N][N], double *g[3], double g_a[N][N][N][3])
     }
 }
 
-void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3]){
+void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3])
+{
 
     int i, j, k;
-    double *X, *Y, *Z ;
-    X = (double*) malloc(N*sizeof(double));
-    Y = (double*) malloc(N*sizeof(double));
-    Z = (double*) malloc(N*sizeof(double));
-    for(i = 0; i < N; i++){
-        X[i] = -pi + i*dx ;
-        for(j = 0; j < N; j++){
-            Y[j] = -pi + j*dx ;
-            for (k = 0; k < N; k++){
-                Z[k]= -pi + k*dx ;
+    double *X, *Y, *Z;
+    X = (double *)malloc(N * sizeof(double));
+    Y = (double *)malloc(N * sizeof(double));
+    Z = (double *)malloc(N * sizeof(double));
+    for (i = 0; i < N; i++)
+    {
+        X[i] = -pi + i * dx;
+        for (j = 0; j < N; j++)
+        {
+            Y[j] = -pi + j * dx;
+            for (k = 0; k < N; k++)
+            {
+                Z[k] = -pi + k * dx;
             }
         }
     }
-    
-    fftw_complex  *out1, *in2, *out2, *in1;
-    fftw_plan     p1, p2;
 
-    in1 = (fftw_complex*) fftw_malloc(sizeof(fftw_complex)*(N*N*N) );
-    out2 = (fftw_complex*) fftw_malloc(sizeof(fftw_complex)*(N*N*N) );
-    out1 = (fftw_complex*) fftw_malloc(sizeof(fftw_complex)*(N*N*N) );
-    in2 = (fftw_complex*) fftw_malloc(sizeof(fftw_complex)*(N*N*N) );
+    fftw_complex *out1, *in2, *out2, *in1;
+    fftw_plan p1, p2;
 
-    p1 = fftw_plan_dft_3d(N, N, N, in1, out1, FFTW_FORWARD,FFTW_MEASURE );
-    p2 = fftw_plan_dft_3d(N, N, N, in2, out2, FFTW_BACKWARD,FFTW_MEASURE);
+    in1 = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (N * N * N));
+    out2 = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (N * N * N));
+    out1 = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (N * N * N));
+    in2 = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * (N * N * N));
 
-    for(i = 0; i < N; i++){
-        for(j = 0; j < N; j++){
-            for (k = 0; k < N; k++){
-                in1[i*N*N + j*N + k][0] = grid_mass[i][j][k]; // row major ordering
-                in1[i*N*N + j*N + k][1] = 0 ;
+    p1 = fftw_plan_dft_3d(N, N, N, in1, out1, FFTW_FORWARD, FFTW_MEASURE);
+    p2 = fftw_plan_dft_3d(N, N, N, in2, out2, FFTW_BACKWARD, FFTW_MEASURE);
+
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < N; k++)
+            {
+                in1[i * N * N + j * N + k][0] = grid_mass[i][j][k]; // row major ordering
+                in1[i * N * N + j * N + k][1] = 0;
             }
         }
     }
 
     fftw_execute(p1); // FFT forward
 
-    for ( i = 0; i < N; i++){   // f = g / ( kx^2 + ky^2 + kz^2 )
-        for( j = 0; j < N; j++){
-            for ( k = 0; k < N; k++){
-                double ksquared=0;
-                in2[i*N*N + j*N + k][0]=0;
-                in2[i*N*N + j*N + k][1]=0;
-                if(2*i<N){
-                    ksquared=((double)i*i);
-                }else{
-                    ksquared=((double)(N-i)*(N-i));
+    for (i = 0; i < N; i++)
+    { // f = g / ( kx^2 + ky^2 + kz^2 )
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < N; k++)
+            {
+                double ksquared = 0;
+                in2[i * N * N + j * N + k][0] = 0;
+                in2[i * N * N + j * N + k][1] = 0;
+                if (2 * i < N)
+                {
+                    ksquared = ((double)i * i);
                 }
-                if(2*j<N){
-                    ksquared+=((double)j*j);
-                }else{
-                    ksquared+=((double)(N-j)*(N-j));
+                else
+                {
+                    ksquared = ((double)(N - i) * (N - i));
                 }
-                if (2*k<N){
-                    ksquared+=((double)k*k);
-                }else{
-                    ksquared+=((double)(N-k)*(N-k));
+                if (2 * j < N)
+                {
+                    ksquared += ((double)j * j);
                 }
-                if(ksquared!=0){
-                    in2[i*N*N + j*N + k][0] = out1[i*N*N + j*N + k][0]/ksquared;
-                    in2[i*N*N + j*N + k][1] = out1[i*N*N + j*N + k][1]/ksquared;
-                }else{
-                    in2[i*N*N + j*N + k][0] = 0;
-                    in2[i*N*N + j*N + k][1] = 0;
+                else
+                {
+                    ksquared += ((double)(N - j) * (N - j));
+                }
+                if (2 * k < N)
+                {
+                    ksquared += ((double)k * k);
+                }
+                else
+                {
+                    ksquared += ((double)(N - k) * (N - k));
+                }
+                if (ksquared != 0)
+                {
+                    in2[i * N * N + j * N + k][0] = out1[i * N * N + j * N + k][0] / ksquared;
+                    in2[i * N * N + j * N + k][1] = out1[i * N * N + j * N + k][1] / ksquared;
+                }
+                else
+                {
+                    in2[i * N * N + j * N + k][0] = 0;
+                    in2[i * N * N + j * N + k][1] = 0;
                 }
             }
         }
@@ -669,41 +706,62 @@ void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3]){
     fftw_execute(p2); //FFT backward
 
     // checking the results computed
-    
+
     double phi[N][N][N];
-    for ( i = 0; i < N; i++){
-        for ( j = 0; j < N; j++){
-            for ( k = 0; k < N; k++){
-                phi[i][j][k]=out2[i*N*N+j*N+k][0]/(N*N*N);
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < N; k++)
+            {
+                phi[i][j][k] = out2[i * N * N + j * N + k][0] / (N * N * N);
             }
         }
     }
 
-    for ( i = 0; i < N; i++){
-        for ( j = 0; j < N; j++){
-            for ( k = 0; k < N; k++){
-                if (i==0){
-                    grid_acc[i][j][k][0]=-(phi[1][j][k]-phi[N-1][j][k])/(2.*dx);
-                }else if (i==(N-1)){
-                    grid_acc[i][j][k][0]=-(phi[0][j][k]-phi[N-2][j][k])/(2.*dx);
-                }else{
-                    grid_acc[i][j][k][0]=-(phi[i+1][j][k]-phi[i-1][j][k])/(2.*dx);
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < N; k++)
+            {
+                if (i == 0)
+                {
+                    grid_acc[i][j][k][0] = -(phi[1][j][k] - phi[N - 1][j][k]) / (2. * dx);
                 }
-                
-                if (j==0){
-                    grid_acc[i][j][k][1]=-(phi[i][1][k]-phi[i][N-1][k])/(2.*dx);
-                }else if (j==(N-1)){
-                    grid_acc[i][j][k][1]=-(phi[i][0][k]-phi[i][N-2][k])/(2.*dx);
-                }else{
-                    grid_acc[i][j][k][1]=-(phi[i][j+1][k]-phi[i][j-1][k])/(2.*dx);
+                else if (i == (N - 1))
+                {
+                    grid_acc[i][j][k][0] = -(phi[0][j][k] - phi[N - 2][j][k]) / (2. * dx);
                 }
-                
-                if (k==0){
-                    grid_acc[i][j][k][2]=-(phi[i][j][1]-phi[i][j][N-1])/(2.*dx);
-                }else if (i==(N-1)){
-                    grid_acc[i][j][k][2]=-(phi[i][j][0]-phi[i][j][N-2])/(2.*dx);
-                }else{
-                    grid_acc[i][j][k][2]=-(phi[i][j][k+1]-phi[i][j][k-1])/(2.*dx);
+                else
+                {
+                    grid_acc[i][j][k][0] = -(phi[i + 1][j][k] - phi[i - 1][j][k]) / (2. * dx);
+                }
+
+                if (j == 0)
+                {
+                    grid_acc[i][j][k][1] = -(phi[i][1][k] - phi[i][N - 1][k]) / (2. * dx);
+                }
+                else if (j == (N - 1))
+                {
+                    grid_acc[i][j][k][1] = -(phi[i][0][k] - phi[i][N - 2][k]) / (2. * dx);
+                }
+                else
+                {
+                    grid_acc[i][j][k][1] = -(phi[i][j + 1][k] - phi[i][j - 1][k]) / (2. * dx);
+                }
+
+                if (k == 0)
+                {
+                    grid_acc[i][j][k][2] = -(phi[i][j][1] - phi[i][j][N - 1]) / (2. * dx);
+                }
+                else if (i == (N - 1))
+                {
+                    grid_acc[i][j][k][2] = -(phi[i][j][0] - phi[i][j][N - 2]) / (2. * dx);
+                }
+                else
+                {
+                    grid_acc[i][j][k][2] = -(phi[i][j][k + 1] - phi[i][j][k - 1]) / (2. * dx);
                 }
             }
         }
@@ -714,5 +772,4 @@ void poisson(double grid_mass[][N][N], double grid_acc[][N][N][3]){
     fftw_free(out2);
     fftw_free(in1);
     fftw_free(in2);
-
 }
