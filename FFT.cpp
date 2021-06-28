@@ -9,7 +9,7 @@
 #define NGP 1
 #define CLC 2
 #define TSC 3
-#define type TSC
+#define type NGP
 
 // Choose the integration type
 #define KDK 1
@@ -22,7 +22,7 @@ const int G = 1;  //gravitational const
 
 const double pi = 3.14159265359;
 const double L = 2. * pi;
-const int N = 8;
+const int N = 5;
 
 int step = 0; // record # of steps
 double t = 0.0;
@@ -194,7 +194,6 @@ int main(void)
 void linspace(float xi, float xf, int n, double func[])
 {
     float space = (xf - xi) / n;
-    // printf("%f\n", space);
     for (int i = 0; i < n; i++)
     {
         func[i] = xi + space / 2 + i * space;
@@ -243,7 +242,7 @@ void csv_converter(char name[], double p[np][3], double pv[np][3], double m[np])
                 // printf("%f ", number);
             }
         }
-        printf("\n");
+        // printf("\n");
     }
 }
 
@@ -304,13 +303,13 @@ void NGP_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
                 {
                     continue;
                 }
-                // if (p[i][j] == 0.0 || p[i][j] == 1.0)
-                // {
-                //     g_sp[i][j] = 0;
-                //     break;
-                // }
+                if (p[i][j] == 0.0 || p[i][j] == 1.0)
+                {
+                    g_sp[i][j] = 0;
+                    break;
+                }
                 double l1 = fabs(p[i][j] - g[j][k]);
-                if (l1 < dx / 2)
+                if (l1 <= dx / 2)
                 {
                     g_sp[i][j] = k;
                     break;
@@ -349,7 +348,7 @@ void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
 {
     for (int i = 0; i < np; i++)
     {
-        int p_pos[3]; // To store the grid number of the current particle. It's the start point
+        // int p_pos[3]; // To store the grid number of the current particle. It's the start point
         double dist[3][2];
         for (int j = 0; j < 3; j++)
         {
@@ -357,7 +356,7 @@ void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
             {
                 if (p[i][j] >= g[j][N - 1])
                 {
-                    p_pos[j] = N - 2;
+                    g_sp[i][j] = N - 2;
                     dist[j][0] = 0;
                     dist[j][1] = 1;
                     break;
@@ -368,13 +367,13 @@ void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
                 }
                 if (p[i][j] <= g[j][0])
                 {
-                    p_pos[j] = 0;
+                    g_sp[i][j] = 0;
                     dist[j][0] = 1;
                     dist[j][1] = 0;
                     break;
                 }
                 double l1 = fabs(p[i][j] - g[j][k]); // In fact, it equals g[j][k] - p[i][j]
-                p_pos[j] = k - 1;
+                g_sp[i][j] = k - 1;
                 dist[j][0] = l1 / dx;
                 dist[j][1] = (dx - l1) / dx;
                 break;
@@ -383,13 +382,13 @@ void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
         // // check starting position
         // printf("(%d, %d, %d)\n", p_pos[0], p_pos[1], p_pos[2]);
 
-        // record the dist. starting point
-        g_sp[i][0] = p_pos[0];
-        g_sp[i][1] = p_pos[1];
-        g_sp[i][2] = p_pos[2];
+        // // record the dist. starting point
+        // g_sp[i][0] = p_pos[0];
+        // g_sp[i][1] = p_pos[1];
+        // g_sp[i][2] = p_pos[2];
 
         // record the mass distribution
-        printf("(%d, %d, %d) :\n", p_pos[0], p_pos[1], p_pos[2]);
+        printf("(%d, %d, %d) :\n", g_sp[i][0], g_sp[i][1], g_sp[i][2]);
         double count = 0;
         for (int xn = 0; xn < 2; xn++)
         {
@@ -398,12 +397,12 @@ void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
                 for (int zn = 0; zn < 2; zn++)
                 {
                     g_w[i][xn][yn][zn] = dist[0][xn] * dist[1][yn] * dist[2][zn];
-                    printf("(%d, %d, %d, %f)\n", xn, yn, zn, g_w[i][xn][yn][zn]);
+                    // printf("(%d, %d, %d, %f)\n", xn, yn, zn, g_w[i][xn][yn][zn]);
                     count += g_w[i][xn][yn][zn];
                 }
             }
         }
-        printf("count is %f\n", count);
+        // printf("count is %f\n", count);
 
         // add mass
         for (int xn = 0; xn < 2; xn++)
@@ -412,7 +411,7 @@ void CLC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
             {
                 for (int zn = 0; zn < 2; zn++)
                 {
-                    g_m[p_pos[0] + xn][p_pos[1] + yn][p_pos[2] + zn] += pm[i] * g_w[i][xn][yn][zn];
+                    g_m[g_sp[i][0] + xn][g_sp[i][1] + yn][g_sp[i][2] + zn] += pm[i] * g_w[i][xn][yn][zn];
                 }
             }
         }
@@ -432,7 +431,7 @@ void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
     // printf("dx = %f\n", dx);
     for (int i = 0; i < np; i++)
     {
-        int p_pos[3]; // To store the grid number of the current particle. It's the start point
+        // int p_pos[3]; // To store the grid number of the current particle. It's the start point
         double dist[3][3];
         for (int j = 0; j < 3; j++)
         {
@@ -440,7 +439,7 @@ void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
             {
                 if (p[i][j] >= g[j][N - 2])
                 {
-                    p_pos[j] = N - 3;
+                    g_sp[i][j] = N - 3;
                     double l1 = fabs(p[i][j] - g[j][N - 2]);
                     if (l1 >= dx / 2)
                     {
@@ -460,7 +459,7 @@ void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
                 }
                 if (p[i][j] <= g[j][1])
                 {
-                    p_pos[j] = 0;
+                    g_sp[i][j] = 0;
                     double l1 = fabs(p[i][j] - g[j][1]); // Use 0-th grid point to define
                     if (l1 >= dx / 2)
                     {
@@ -477,7 +476,7 @@ void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
                 double l1 = fabs(p[i][j] - g[j][k]); // In fact, it equals g[j][k] - p[i][j]
                 if (l1 <= dx / 2)
                 {
-                    p_pos[j] = k - 1;
+                    g_sp[i][j] = k - 1;
                     dist[j][0] = pow((0.5 * dx + l1) / dx, 2) / 2;
                     dist[j][1] = 1 - pow((0.5 * dx + l1) / dx, 2) / 2 - pow((0.5 * dx - l1) / dx, 2) / 2;
                     dist[j][2] = pow((0.5 * dx - l1) / dx, 2) / 2;
@@ -485,7 +484,7 @@ void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
                 }
                 else
                 {
-                    p_pos[j] = k - 2;
+                    g_sp[i][j] = k - 2;
                     dist[j][0] = pow((l1 - 0.5 * dx) / dx, 2) / 2;
                     dist[j][1] = 1 - pow((l1 - 0.5 * dx) / dx, 2) / 2 - pow((1.5 * dx - l1) / dx, 2) / 2;
                     dist[j][2] = pow((1.5 * dx - l1) / dx, 2) / 2;
@@ -496,10 +495,10 @@ void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
         // // check starting position
         // printf("(%d, %d, %d)\n", p_pos[0], p_pos[1], p_pos[2]);
 
-        // record the dist. starting point
-        g_sp[i][0] = p_pos[0];
-        g_sp[i][1] = p_pos[1];
-        g_sp[i][2] = p_pos[2];
+        // // record the dist. starting point
+        // g_sp[i][0] = p_pos[0];
+        // g_sp[i][1] = p_pos[1];
+        // g_sp[i][2] = p_pos[2];
 
         // record the mass distribution
         // printf("(%d, %d, %d) :\n", p_pos[0], p_pos[1], p_pos[2]);
@@ -527,7 +526,7 @@ void TSC_deposition(double p[np][3], double pm[np], double *g[3], double g_m[N][
             {
                 for (int zn = 0; zn < 3; zn++)
                 {
-                    g_m[p_pos[0] + xn][p_pos[1] + yn][p_pos[2] + zn] += pm[i] * g_w[i][xn][yn][zn];
+                    g_m[g_sp[i][0] + xn][g_sp[i][1] + yn][g_sp[i][2] + zn] += pm[i] * g_w[i][xn][yn][zn];
                     count += pm[i] * g_w[i][xn][yn][zn];
                     printf("%f ", pm[i] * g_w[i][xn][yn][zn]);
                 }
@@ -618,6 +617,11 @@ void get_acc(double p[np][3], double pm[np], double *g[3], double a[np][3])
     {
         TSC_deposition(p, pm, g, grid_mass, grid_start_pos, grid_weight);
     }
+
+    // for (int i = 0; i < np; i++)
+    // {
+    //     printf("(%d, %d, %d)\n", grid_start_pos[i][0], grid_start_pos[i][1], grid_start_pos[i][2]);
+    // }
 
     // Calculate the gravitational force with Poisson solver
     poisson(grid_mass, grid_acc);
