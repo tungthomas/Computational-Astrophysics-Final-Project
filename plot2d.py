@@ -4,7 +4,7 @@ import matplotlib.animation as animation
 
 # parameters need to specified first
 figure_size = 1
-speed = 500
+t_per_img = 20
 
 count = 0
 with open('data.txt', 'r') as file:
@@ -14,7 +14,7 @@ with open('data.txt', 'r') as file:
             count += 1
         else:
             break
-        # print(i)
+        print(i)
 # print(line[0])
 
 np = count-1
@@ -30,14 +30,14 @@ for i in range(steps):
         elif(j == np+1):
             continue
         else:
-            sp = line[n].find('.')
-            a = float(line[n][sp+7:sp+15])
-            b = float(line[n][sp+17:sp+25])
-            c = float(line[n][sp+27:sp+35])
+            spo = line[n].find('(')
+            npo = line[n].find(')')
+            x = line[n][spo+1:npo].split(",")
+            print(x)
             # print(a, b, c, (i, j))
-            pos[i][j-1][0] = a
-            pos[i][j-1][1] = b
-            pos[i][j-1][2] = c
+            pos[i][j-1][0] = float(x[0])
+            pos[i][j-1][1] = float(x[1])
+            pos[i][j-1][2] = float(x[2])
         # print(line[n])
 
 print('number of particle is ', np)
@@ -92,5 +92,5 @@ def update(i):
 # create movie
 nframe = steps-1
 anim = animation.FuncAnimation(fig, func=update, init_func=init,
-                               frames=nframe, interval=speed, repeat=False)
+                               frames=nframe, interval=t_per_img, repeat=False)
 plt.show()
